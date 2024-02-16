@@ -1,0 +1,9 @@
+%YAML:1.0
+cam0:
+  cam_overlaps: []
+  camera_model: pinhole
+  distortion_coeffs: [-0.4348389609573682, 0.1811067203432642, -6.991356923649028e-05, 0.0014513220272668584]
+  distortion_model: radtan
+  intrinsics: [515.3132156534713, 513.0418613640853, 307.2470714657108, 261.1248935768653]
+  resolution: [640, 512]
+  rostopic: /boson_camera_array/cam_3/image_raw
