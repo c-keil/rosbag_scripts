@@ -17,6 +17,19 @@ def camera_data(path):
     data = {"path":path, "files":files, "stamps":stamps, "times":stamps_float}
     return data
 
+def remove_frame(data, i):
+    for key in data.keys():
+        d = data[key]
+        if type(d) == list:
+            data[key] = d[:i]+d[i+1:]
+        elif type(d) == np.ndarray:
+            data[key] = np.hstack((d[:i],d[i+1:]))
+        elif type(d) is str:
+            pass
+        else:
+            raise TypeError("type is {}".format(type(d)))
+    return data
+
 def heal_data_one_way(leader, follower):
         #loop over data to find breaks
         i = 0
@@ -100,7 +113,8 @@ def heal_bidirectional(leader, follower):
             if t2 > t1:
                 print("delta = {}".format(delta))
                 print("shortening leader at {} with len {}".format(i,len(leader["times"])))
-                leader["times"] = np.hstack((leader["times"][:i],leader["times"][i+1:]))
+                remove_frame(leader,i)
+                # leader["times"] = np.hstack((leader["times"][:i],leader["times"][i+1:]))
                 print("to len {}".format(len(leader["times"])))
                 t1 = leader["times"][i] 
                 t2 = follower["times"][i]
@@ -110,7 +124,8 @@ def heal_bidirectional(leader, follower):
             else:
                 print("delta = {}".format(delta))
                 print("shortening follower at {} with len {}".format(i,len(follower["times"])))
-                follower["times"] = np.hstack((follower["times"][:i],follower["times"][i+1:]))
+                # follower["times"] = np.hstack((follower["times"][:i],follower["times"][i+1:]))
+                remove_frame(follower, i)
                 print("to len {}".format(len(follower["times"])))
                 t1 = leader["times"][i] 
                 t2 = follower["times"][i]
@@ -123,7 +138,8 @@ def heal_bidirectional(leader, follower):
                 print("FOLLOWER AHHEAD")
                 print("delta = {}".format(delta))
                 print("shortening leader at {} with len {}".format(i,len(leader["times"])))
-                leader["times"] = np.hstack((leader["times"][:i],leader["times"][i+1:]))
+                remove_frame(leader,i)
+                # leader["times"] = np.hstack((leader["times"][:i],leader["times"][i+1:]))
                 print("to len {}".format(len(leader["times"])))
                 t1 = leader["times"][i] 
                 t2 = follower["times"][i]
