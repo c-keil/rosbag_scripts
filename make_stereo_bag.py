@@ -9,12 +9,12 @@ import glob
 # import rospy 
 import matplotlib.pyplot as plt
 
-def camera_data(path):
+def camera_data(path, topic):
     #read in camera data and get stamps
     files = sorted(glob.glob(os.path.join(path,"*.png")))
     stamps = [os.path.basename(f)[:-4] for f in files]
     stamps_float = np.array([float(s[:10] + "." + s[10:]) for s in stamps])
-    data = {"path":path, "files":files, "stamps":stamps, "times":stamps_float}
+    data = {"path":path, "files":files, "stamps":stamps, "times":stamps_float, "topic":topic}
     return data
 
 def remove_frame(data, i):
@@ -152,6 +152,9 @@ def heal_bidirectional(leader, follower):
         
     return leader, follower
 
+def stamp_to_ros_stamp(stamp):
+    return int(stamp[:10]), int(stamp[10:])
+
 if __name__ == "__main__":
 
     #read in images
@@ -160,9 +163,15 @@ if __name__ == "__main__":
 
     path1 = "/media/colin/DATA1/kri_day2/cam3/matlab_clahe2"
     path2 = "/media/colin/DATA1/kri_day2/cam2/matlab_clahe2"
+    topic1 = "/boson_camera_array/cam3/image_raw"
+    topic2 = "/boson_camera_array/cam2/image_raw"
+    save_path = "/home/colin/kri_day_bag.bag"
+    save_path1 = "/media/colin/DATA1/kri_day2/stereo/cam_3"
+    save_path2 = "/media/colin/DATA1/kri_day2/stereo/cam_2"
 
-    camera1_data = camera_data(path1)
-    camera2_data = camera_data(path2)
+    start_stamp = 1689804919375999928
+    camera1_data = camera_data(path1, topic1)
+    camera2_data = camera_data(path2, topic2)
 
     stamps1 = camera1_data["times"]
     stamps2 = camera2_data["times"]
@@ -198,40 +207,46 @@ if __name__ == "__main__":
     # follower, leader = heal_data(follower, leader)
 
     error = leader["times"][:len(follower["times"])]-follower["times"]
-    # while True:
-    #     if (i >= len(leader["times"])) or (j >= len(follower["times"])):
-    #         break 
-    #     t1 = leader["times"][i]
-    #     # t2 = follower["times"][j]
-        
-    #     delta1 = t1 - t1_
-        
-        
-    #     delta = t1 - t2
-    #     abs_delta = np.abs(delta)
-    #     if last_delta is None:
-    #         last_delta = abs_delta
-        
-    #     #find discontinuity
-    #     if np.abs(abs_delta - last_delta) > max_delta:
-    #         print(i)
+
+    #actually make the bag
+    import rospy
+    import rosbag
+    import cv_bridge
+    from sensor_msgs.msg import Image, CameraInfo
+    from std_msgs.msg import Header
+    from shutil import copy2
+    bridge = cv_bridge.CvBridge()
+
+    with rosbag.Bag(save_path, "w") as outbag:
+        i = 0
+        leader_topic = leader["topic"]
+        follower_topic = follower["topic"]
+        for i in range(len(leader["times"])):
+            f1 = leader["files"][i]
+            f2 = follower["files"][i]
+            print(f1)
+            print(f2)
+
+            stamp1 = leader["stamps"][i]
+            if int(stamp1) < start_stamp:
+                continue
             
-    #         #identify which steam is missing frames
-    #         # if delta > 1
-    # # else:
-    #     #book keeping
-    #     i += 1
-    #     j += 1
-    #     last_delta = abs_delta
+            #write rosbag
+            image1 = cv2.imread(f1, 0)
+            image2 = cv2.imread(f2, 0)
+            image_message1 = bridge.cv2_to_imgmsg(image1, header=Header(seq = i))
+            image_message1.header.stamp.secs, image_message1.header.stamp.nsecs = stamp_to_ros_stamp(stamp1)
+            image_message2 = bridge.cv2_to_imgmsg(image2, header=Header(seq = i))
+            image_message2.header.stamp.secs, image_message2.header.stamp.nsecs = stamp_to_ros_stamp(stamp1) #use stamp 1 for both
+            outbag.write(topic1, image_message1, t=image_message1.header.stamp)
+            outbag.write(topic2, image_message2, t=image_message2.header.stamp)
 
+            #copy files
+            copy2(f1, save_path1)
+            copy2(f2, os.path.join(save_path2,os.path.basename(f1)))
 
-# start_sync_window = 60
-# start_error = stamps1_float[0]-stamps2_float[-start_sync_window]
-
-# error = stamps1_float - stamps2_float[:len(stamps1_float)]
-
-    fig, ax = plt.subplots()
-    ax.plot(error)
-    plt.show()
-# # ax.plot(stamps1_float)
-# # ax.plot(stamps2_float)
+    print("Max error = {}".format(np.max(np.abs(error))))
+    print("mean error = {}".format(np.mean(error)))
+    # fig, ax = plt.subplots()
+    # ax.plot(error)
+    # plt.show()
